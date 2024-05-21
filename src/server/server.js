@@ -14,9 +14,14 @@ const InputError = require('../exceptions/InputError');
             cors: {
               origin: ['*'],
             },
+            payload:{
+                maxBytes:1000000
+            }
         },
     });
-    
+    const model = await loadModel();
+    server.app.model = model;
+
     server.route(routes);
     server.ext('onPreResponse', function (request, h) {
         const response = request.response;
@@ -26,25 +31,30 @@ const InputError = require('../exceptions/InputError');
                 status: 'fail',
                 message: 'Terjadi kesalahan dalam melakukan prediksi'
             })
-            newResponse.code(response.statusCode)
+            newResponse.code(response.statusCode || 400)
             return newResponse;
         }
  
         if (response.isBoom) {
+            if(response.output.statusCode === 413){
             const newResponse = h.response({
                 status: 'fail',
                 message: 'Payload content length greater than maximum allowed: 1000000'
             })
             newResponse.code(413)
             return newResponse;
-        
+            }
+            else if (response.output.statusCode === 400) {
+                const newResponse = h.response({
+                    status: 'fail',
+                    message: 'Bad Request'
+                });
+                newResponse.code(400);
+                return newResponse;
+            }
     }
         return h.continue;
-    });
-    
-    const model = await loadModel();
-    server.app.model = model;
-
-        await server.start();
+    });   
+    await server.start();
         console.log(`Server start at: ${server.info.uri}`);
     })();
